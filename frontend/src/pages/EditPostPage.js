@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getPostById, updatePost, getCategories, getTags } from '../services/api'; // Assuming api.js exports these
-import { ArrowLeftIcon } from '@heroicons/react/24/solid'; // Example icon
+import { getPost, updatePost, getCategories, getTags } from '../services/api'; // Corrected: getPost instead of getPostById
+import { ArrowLeftIcon } from '@heroicons/react/24/solid';
 
 function EditPostPage() {
   const { postId } = useParams();
   const navigate = useNavigate();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const [status, setStatus] = useState('draft'); // 'draft' or 'published'
+  const [status, setStatus] = useState('draft');
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [selectedTags, setSelectedTags] = useState([]);
   
@@ -20,25 +20,25 @@ function EditPostPage() {
   const [formError, setFormError] = useState('');
 
   const fetchPostData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      setError(null);
-      const postData = await getPostById(postId);
-      setTitle(postData.title);
-      setContent(postData.content);
-      setStatus(postData.status);
-      setSelectedCategories(postData.categories.map(cat => cat.id)); 
-      setSelectedTags(postData.tags.map(tag => tag.id));
+      const postData = await getPost(postId); // Corrected: getPost call
+      setTitle(postData.title || '');
+      setContent(postData.content || '');
+      setStatus(postData.status || 'draft');
+      setSelectedCategories((postData.categories || []).map(cat => cat.id)); 
+      setSelectedTags((postData.tags || []).map(tag => tag.id));
 
-      const categoriesData = await getCategories();
-      setAllCategories(categoriesData);
+      const categoriesResponse = await getCategories();
+      setAllCategories(categoriesResponse?.data || []); // Corrected: access .data property and ensure array
 
-      const tagsData = await getTags();
-      setAllTags(tagsData);
+      const tagsResponse = await getTags();
+      setAllTags(tagsResponse?.data || []); // Corrected: access .data property and ensure array
 
     } catch (err) {
       console.error('Failed to fetch post data:', err);
-      setError('Failed to load post data. Please try again.');
+      setError(`Failed to load post data: ${err.message || 'Please try again.'}`);
     } finally {
       setLoading(false);
     }
@@ -72,39 +72,41 @@ function EditPostPage() {
       return;
     }
     
-    const postData = {
+    const postPayload = {
       title,
       content,
       status,
-      category_ids: selectedCategories,
-      tag_ids: selectedTags,
+      categoryIds: selectedCategories, // Corrected: to match backend controller (categoryIds)
+      tagIds: selectedTags,           // Corrected: to match backend controller (tagIds)
     };
 
+    setLoading(true);
     try {
-      setLoading(true);
-      await updatePost(postId, postData);
-      navigate(`/manage-posts`); // Or to the post view page if one exists
+      await updatePost(postId, postPayload);
+      navigate(`/manage-posts`);
     } catch (err) {
       console.error('Failed to update post:', err);
-      setFormError('Failed to update post. Please try again.');
+      const apiErrorMessage = err.response?.data?.message || err.message;
+      setFormError(`Failed to update post: ${apiErrorMessage || 'Please try again.'}`);
+    } finally {
       setLoading(false);
     }
   };
 
   if (loading && !title) return <div className="p-8 text-center text-neutral-darkGray">Loading post editor...</div>;
-  if (error) return <div className="p-8 text-center text-error">Error: {error}</div>;
+  if (error) return <div className="p-8 text-center text-status-error">Error: {error}</div>; // Corrected: text-status-error
 
   return (
     <div className="container mx-auto p-4 md:p-8 bg-white shadow-lg rounded-lg">
       <button 
         onClick={() => navigate(-1)} 
-        className="mb-6 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+        className="mb-6 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-blue hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-blue transition-colors"
       >
-        <ArrowLeftIcon className="h-5 w-5 mr-2" />
+        <ArrowLeftIcon className="h-5 w-5 mr-2" aria-hidden="true" />
         Back
       </button>
       <h1 className="text-3xl font-bold mb-6 text-neutral-darkGray font-poppins">Edit Post</h1>
-      {/* Placeholder for PostForm component. For now, a basic form: */}
+      
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
           <label htmlFor="title" className="block text-sm font-medium text-neutral-darkGray">Title</label>
@@ -114,7 +116,7 @@ function EditPostPage() {
             value={title} 
             onChange={(e) => setTitle(e.target.value)} 
             required 
-            className="mt-1 block w-full px-3 py-2 border border-neutral-mediumGray rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+            className="mt-1 block w-full px-3 py-2 border border-neutral-mediumGray rounded-md shadow-sm focus:outline-none focus:ring-primary-blue focus:border-primary-blue sm:text-sm"
           />
         </div>
         <div>
@@ -124,7 +126,7 @@ function EditPostPage() {
             value={content} 
             onChange={(e) => setContent(e.target.value)} 
             rows="10" 
-            className="mt-1 block w-full px-3 py-2 border border-neutral-mediumGray rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+            className="mt-1 block w-full px-3 py-2 border border-neutral-mediumGray rounded-md shadow-sm focus:outline-none focus:ring-primary-blue focus:border-primary-blue sm:text-sm"
           ></textarea>
         </div>
         <div>
@@ -133,7 +135,7 @@ function EditPostPage() {
             id="status" 
             value={status} 
             onChange={(e) => setStatus(e.target.value)} 
-            className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-neutral-mediumGray focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-md"
+            className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-neutral-mediumGray focus:outline-none focus:ring-primary-blue focus:border-primary-blue sm:text-sm rounded-md"
           >
             <option value="draft">Draft</option>
             <option value="published">Published</option>
@@ -150,13 +152,13 @@ function EditPostPage() {
                 id={`category-${category.id}`} 
                 checked={selectedCategories.includes(category.id)} 
                 onChange={() => handleCategoryChange(category.id)} 
-                className="h-4 w-4 text-primary border-neutral-mediumGray rounded focus:ring-primary"
+                className="h-4 w-4 text-primary-blue border-neutral-mediumGray rounded focus:ring-primary-blue"
               />
               <label htmlFor={`category-${category.id}`} className="ml-2 block text-sm text-neutral-darkGray">
                 {category.name}
               </label>
             </div>
-          )) : <p className="text-sm text-neutral-darkGray">No categories available. Create some first!</p>}
+          )) : <p className="text-sm text-neutral-darkGray">No categories available. You can create them in the 'Manage Categories' section.</p>}
         </div>
 
         {/* Tags Selection */}
@@ -169,29 +171,30 @@ function EditPostPage() {
                 id={`tag-${tag.id}`} 
                 checked={selectedTags.includes(tag.id)} 
                 onChange={() => handleTagChange(tag.id)} 
-                className="h-4 w-4 text-primary border-neutral-mediumGray rounded focus:ring-primary"
+                className="h-4 w-4 text-primary-blue border-neutral-mediumGray rounded focus:ring-primary-blue"
               />
               <label htmlFor={`tag-${tag.id}`} className="ml-2 block text-sm text-neutral-darkGray">
                 {tag.name}
               </label>
             </div>
-          )) : <p className="text-sm text-neutral-darkGray">No tags available. Create some first!</p>}
+          )) : <p className="text-sm text-neutral-darkGray">No tags available. You can create them in the 'Manage Tags' section.</p>}
         </div>
 
-        {formError && <p className="text-sm text-error">{formError}</p>}
+        {formError && <p className="text-sm text-status-error">{formError}</p>} {/* Corrected: text-status-error */}
         
-        <div className="flex justify-end space-x-3">
+        <div className="flex justify-end space-x-3 pt-4 border-t border-neutral-lightGray">
             <button 
                 type="button" 
                 onClick={() => navigate('/manage-posts')} 
-                className="px-4 py-2 border border-neutral-mediumGray text-sm font-medium rounded-md text-neutral-darkGray bg-white hover:bg-neutral-lightGray focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                className="px-4 py-2 border border-neutral-mediumGray text-sm font-medium rounded-md text-neutral-darkGray bg-white hover:bg-neutral-lightGray focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-blue transition-colors"
+                disabled={loading}
             >
                 Cancel
             </button>
             <button 
                 type="submit" 
                 disabled={loading} 
-                className="px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
+                className="px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-blue hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-blue disabled:opacity-50 transition-colors"
             >
                 {loading ? 'Saving...' : 'Save Changes'}
             </button>
