@@ -12,10 +12,10 @@ set -o pipefail
 # Assuming this script is run from the project root directory
 cd backend
 
-# Install dependencies (optional, but good practice if not handled by a separate build step)
+# Install dependencies
 # If you are using npm:
-# echo "Installing dependencies..."
-# npm install
+echo "Installing dependencies..."
+npm install
 # If you are using yarn:
 # echo "Installing dependencies..."
 # yarn install
